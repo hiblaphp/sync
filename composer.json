@@ -1,0 +1,32 @@
+{
+    "name": "hiblaphp/sync",
+    "description": "Non-blocking synchronization primitives (Mutex, Semaphore) for async PHP",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Hibla\\Sync\\": "src/"
+        }
+    },
+    "minimum-stability": "dev",
+    "require": {
+        "php": "^8.2",
+        "hiblaphp/async": "dev-main"
+    },
+    "require-dev": {
+        "pestphp/pest": "^3.0",
+        "phpstan/phpstan": "^2.1",
+        "phpstan/phpstan-strict-rules": "^2.0",
+        "laravel/pint": "^1.25"
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/pest",
+        "format": "vendor/bin/pint",
+        "analyze": "vendor/bin/phpstan analyse"
+    }
+}
