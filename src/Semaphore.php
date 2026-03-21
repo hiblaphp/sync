@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Hibla\Sync;
 
 use function Hibla\async;
+
 use Hibla\Promise\Interfaces\PromiseInterface;
 use Hibla\Promise\Promise;
+use Hibla\Sync\Interfaces\SemaphoreInterface;
 
 /**
  * A counting semaphore for controlling concurrent access to shared resources.
@@ -49,23 +51,13 @@ use Hibla\Promise\Promise;
  * }
  * ```
  */
-class Semaphore
+class Semaphore implements SemaphoreInterface
 {
     private int $available;
 
     private int $capacity;
 
     /**
-     * Promises queued waiting to acquire permits, keyed by spl_object_id.
-     *
-     * Keyed array preserves FIFO insertion order and allows O(1) removal
-     * by object ID when a queued promise is cancelled. Each entry tracks
-     * the pending Promise and the number of permits it needs.
-     *
-     * The head waiter accumulates permits across multiple release() calls
-     * until its full requirement is met — smaller requests behind it do
-     * not jump the queue, preventing starvation of large-permit requests.
-     *
      * @var array<int, array{promise: Promise<$this>, needed: int}>
      */
     private array $queue = [];
@@ -89,20 +81,7 @@ class Semaphore
     }
 
     /**
-     * Acquire a single permit.
-     *
-     * If a permit is available, it is immediately acquired and a resolved
-     * promise containing this instance is returned.
-     *
-     * If no permits are available, a pending promise is created, added to
-     * the FIFO queue, and returned. The promise resolves with this instance
-     * when a permit becomes available.
-     *
-     * Cancelling the returned promise removes it from the queue immediately
-     * without consuming any permit or skipping other waiters.
-     *
-     * @return PromiseInterface<$this> Promise that resolves with this semaphore
-     *                                 instance when a permit is acquired.
+     * @inheritDoc
      */
     public function acquire(): PromiseInterface
     {
@@ -110,23 +89,7 @@ class Semaphore
     }
 
     /**
-     * Acquire N permits atomically.
-     *
-     * The promise only resolves when N permits are simultaneously available.
-     * Permits accumulate across multiple release() calls — the promise will
-     * not resolve early with fewer than the requested number.
-     *
-     * The head waiter in the queue is never bypassed by smaller requests
-     * that arrive later — FIFO order is preserved to prevent starvation.
-     *
-     * Cancelling the returned promise removes it from the queue immediately.
-     * No permits are consumed and no other waiters are affected.
-     *
-     * @param  int  $permits  Number of permits to acquire atomically (must be >= 1
-     *                        and <= capacity).
-     * @return PromiseInterface<$this> Promise that resolves with this semaphore
-     *                                 instance when all N permits are acquired.
-     * @throws \InvalidArgumentException If permits < 1 or permits > capacity.
+     * @inheritDoc
      */
     public function acquireMany(int $permits): PromiseInterface
     {
@@ -160,19 +123,7 @@ class Semaphore
     }
 
     /**
-     * Release a single permit back to the semaphore.
-     *
-     * If no fibers are waiting, the permit is returned to the available pool.
-     *
-     * If fibers are waiting, the permit is offered to the head waiter. If
-     * the head waiter's accumulated permits now meet its requirement, its
-     * promise is resolved and it is removed from the queue. Otherwise the
-     * permit stays in the pool and the head waiter continues accumulating.
-     *
-     * Only fibers that hold a permit should call release(). Releasing more
-     * permits than the semaphore capacity throws immediately.
-     *
-     * @throws \LogicException If releasing would exceed semaphore capacity.
+     * @inheritDoc
      */
     public function release(): void
     {
@@ -190,7 +141,7 @@ class Semaphore
         // can accumulate permits across multiple release() calls
         $this->available++;
 
-        $id    = array_key_first($this->queue);
+        $id = array_key_first($this->queue);
         $entry = $this->queue[$id];
 
         // Only satisfy the head waiter when enough permits have accumulated
@@ -202,18 +153,7 @@ class Semaphore
     }
 
     /**
-     * Release N permits back to the semaphore.
-     *
-     * Validates the full release before touching any state. If releasing N
-     * permits would exceed the semaphore capacity, throws LogicException
-     * before any permits are returned — no partial corruption.
-     *
-     * Internally calls release() N times, satisfying queued waiters as
-     * permits become available.
-     *
-     * @param  int  $permits  Number of permits to release (must be >= 1).
-     * @throws \InvalidArgumentException If permits < 1.
-     * @throws \LogicException If releasing would exceed semaphore capacity.
+     * @inheritDoc
      */
     public function releaseMany(int $permits): void
     {
@@ -241,17 +181,7 @@ class Semaphore
     }
 
     /**
-     * Acquire a single permit, execute the callable in a fiber, then release automatically.
-     *
-     * Shorthand for withPermits(1, $callable). This is the preferred API for
-     * single-permit acquisition — release is guaranteed on all outcomes with
-     * no try/finally boilerplate required from the caller.
-     *
-     * @template TReturn
-     * @param  callable(): TReturn  $callable  The callable to execute inside the permit.
-     *                                          Use await() freely — it runs in a fiber.
-     * @return PromiseInterface<TReturn> Promise that resolves with the callable's
-     *                                   return value once the permit is released.
+     * @inheritDoc
      */
     public function withPermit(callable $callable): PromiseInterface
     {
@@ -259,32 +189,11 @@ class Semaphore
     }
 
     /**
-     * Acquire N permits atomically, execute the callable in a fiber, then release automatically.
-     *
-     * This is the preferred API over acquireMany() and releaseMany(). Release
-     * of all N permits is guaranteed on all outcomes — fulfillment, rejection,
-     * and cancellation — with no try/finally boilerplate required from the caller.
-     *
-     * The callable runs inside async() implicitly. Use await() freely inside
-     * it — all N permits remain held across every suspension point until the
-     * callable completes or throws:
-     *
-     * ```php
-     * await($semaphore->withPermits(3, function () {
-     *     $a = await(fetchA()); // all 3 permits held across this await
-     *     $b = await(fetchB()); // and this one
-     *     $c = await(fetchC()); // and this one
-     *     return [$a, $b, $c];
-     * }));
-     * ```
-     *
-     * Cancelling the promise returned by withPermits() releases all N permits
-     * immediately and cancels the in-flight callable.
+     * @inheritDoc
      *
      * @template TReturn
-     * @param  int  $permits  Number of permits to acquire atomically (must be >= 1
-     *                        and <= capacity).
-     * @param  callable(): TReturn  $callable  The callable to execute inside the permits.
+     * @param int $permits Number of permits to acquire atomically (must be >= 1 and <= capacity).
+     * @param  callable(): TReturn $callable  The callable to execute inside the permits.
      *                                          Use await() freely — it runs in a fiber.
      * @return PromiseInterface<TReturn> Promise that resolves with the callable's
      *                                   return value once all permits are released.
@@ -313,16 +222,7 @@ class Semaphore
     }
 
     /**
-     * Try to acquire a single permit without waiting.
-     *
-     * Returns true immediately if a permit is available and acquires it.
-     * Returns false immediately if no permits are available. Never queues.
-     *
-     * Use this when you want to do something else if the resource is busy
-     * rather than waiting. If you acquire a permit, release it manually
-     * in a finally block when done.
-     *
-     * @return bool True if a permit was acquired, false if none are available.
+     * @inheritDoc
      */
     public function tryAcquire(): bool
     {
@@ -336,7 +236,7 @@ class Semaphore
     }
 
     /**
-     * Returns the number of permits currently available for immediate acquisition.
+     * @inheritDoc
      */
     public function getAvailable(): int
     {
@@ -344,7 +244,7 @@ class Semaphore
     }
 
     /**
-     * Returns the maximum number of permits this semaphore manages.
+     * @inheritDoc
      */
     public function getCapacity(): int
     {
@@ -352,7 +252,7 @@ class Semaphore
     }
 
     /**
-     * Returns the number of promises currently waiting to acquire permits.
+     * @inheritDoc
      */
     public function getQueueLength(): int
     {
@@ -360,7 +260,7 @@ class Semaphore
     }
 
     /**
-     * Returns true if no promises are waiting to acquire permits.
+     * @inheritDoc
      */
     public function isQueueEmpty(): bool
     {
@@ -368,7 +268,7 @@ class Semaphore
     }
 
     /**
-     * Returns true if no permits are available (all are currently held).
+     * @inheritDoc
      */
     public function isFull(): bool
     {
@@ -376,7 +276,7 @@ class Semaphore
     }
 
     /**
-     * Returns true if all permits are available (none are currently held).
+     * @inheritDoc
      */
     public function isIdle(): bool
     {

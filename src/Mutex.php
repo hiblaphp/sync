@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Hibla\Sync;
 
 use function Hibla\async;
+
 use Hibla\Promise\Interfaces\PromiseInterface;
 use Hibla\Promise\Promise;
+use Hibla\Sync\Interfaces\MutexInterface;
 
 /**
  * A mutual exclusion lock for coordinating access to shared state in async PHP.
@@ -44,32 +46,21 @@ use Hibla\Promise\Promise;
  * }
  * ```
  */
-class Mutex
+class Mutex implements MutexInterface
 {
-    private bool $locked = false;
-
     /**
      * @var array<int, Promise<$this>>
      */
     private array $queue = [];
 
-    public function __construct() {}
+    private bool $locked = false;
+
+    public function __construct()
+    {
+    }
 
     /**
-     * Acquire the mutex lock.
-     *
-     * If the mutex is not currently locked, it is immediately acquired and
-     * a resolved promise containing this instance is returned.
-     *
-     * If the mutex is already locked, a pending promise is created, added
-     * to the FIFO queue, and returned. The promise resolves with this
-     * instance when the lock becomes available.
-     *
-     * Cancelling the returned promise removes it from the queue immediately
-     * without affecting the lock state or skipping other waiters.
-     *
-     * @return PromiseInterface<$this> Promise that resolves with this mutex
-     *                                 instance when the lock is acquired.
+     * @inheritDoc
      */
     public function acquire(): PromiseInterface
     {
@@ -92,19 +83,7 @@ class Mutex
     }
 
     /**
-     * Release the mutex lock.
-     *
-     * If no fibers are waiting, the mutex is unlocked and marked available
-     * for immediate acquisition.
-     *
-     * If fibers are waiting, ownership transfers directly to the next promise
-     * in the queue — the mutex stays locked the entire time. The next waiter's
-     * promise is resolved with this instance.
-     *
-     * Only the fiber that currently holds the lock should call release().
-     * Calling release() without holding the lock throws immediately.
-     *
-     * @throws \LogicException If called when the mutex is not locked.
+     * @inheritDoc
      */
     public function release(): void
     {
@@ -126,26 +105,7 @@ class Mutex
     }
 
     /**
-     * Acquire the lock, execute the callable in a fiber, then release automatically.
-     *
-     * This is the preferred API over acquire() and release(). Release is
-     * guaranteed on all outcomes — fulfillment, rejection, and cancellation —
-     * with no try/finally boilerplate required from the caller.
-     *
-     * The callable runs inside async() implicitly. Use await() freely inside
-     * it — the lock remains held across all suspension points until the
-     * callable completes or throws:
-     *
-     * ```php
-     * await($mutex->withLock(function () {
-     *     $user   = await(fetchUser(1));    // lock held across this await
-     *     $orders = await(fetchOrders(1));  // and this one
-     *     return processOrders($user, $orders);
-     * }));
-     * ```
-     *
-     * Cancelling the promise returned by withLock() releases the lock
-     * immediately and cancels the in-flight callable.
+     * @inheritDoc
      *
      * @template TReturn
      * @param  callable(): TReturn  $callable  The callable to execute inside the lock.
@@ -170,10 +130,7 @@ class Mutex
     }
 
     /**
-     * Returns true if the mutex is currently locked.
-     *
-     * Useful for debugging and monitoring. Do not use this for control flow —
-     * the lock state can change between checking and acting on the result.
+     * @inheritDoc
      */
     public function isLocked(): bool
     {
@@ -181,7 +138,7 @@ class Mutex
     }
 
     /**
-     * Returns the number of promises currently waiting to acquire the lock.
+     * @inheritDoc
      */
     public function getQueueLength(): int
     {
@@ -189,7 +146,7 @@ class Mutex
     }
 
     /**
-     * Returns true if no promises are waiting to acquire the lock.
+     * @inheritDoc
      */
     public function isQueueEmpty(): bool
     {
