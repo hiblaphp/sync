@@ -65,6 +65,13 @@ shared state in async PHP applications. Both primitives are built on promises
 and fibers — they never block the thread, queue waiters cooperatively, and
 integrate cleanly with cancellation.
 
+> **Note:** This library is designed to be used with
+> [`hiblaphp/async`](https://github.com/hiblaphp/async). The `withLock()` and
+> `withPermit()` helpers run their callable inside `async()` implicitly, so
+> `await()` works freely inside them and the critical section reads like
+> ordinary synchronous PHP. While the lower-level `acquire()` and `release()`
+> methods work with raw promise chains, `withLock()` and `withPermit()` are the
+> recommended API for any `hiblaphp/async` application.
 ### Why you need this
 
 PHP is single-threaded. Only one piece of code runs at any given moment. This
