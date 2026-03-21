@@ -19,7 +19,7 @@ describe('Semaphore', function () {
 
         expect($semaphore->getCapacity())->toBe(3)
             ->and($semaphore->getAvailable())->toBe(3)
-            ->and($semaphore->isEmpty())->toBeTrue()
+            ->and($semaphore->isIdle())->toBeTrue()
             ->and($semaphore->isFull())->toBeFalse()
         ;
     });
@@ -44,7 +44,7 @@ describe('Semaphore', function () {
 
         $semaphore->release();
         expect($semaphore->getAvailable())->toBe(2)
-            ->and($semaphore->isEmpty())->toBeTrue()
+            ->and($semaphore->isIdle())->toBeTrue()
         ;
     });
 
@@ -149,13 +149,11 @@ describe('Semaphore', function () {
 
     it('throws exception when acquiring more permits than capacity', function () {
         $semaphore = new Semaphore(3);
-
         $semaphore->acquireMany(5);
     })->throws(InvalidArgumentException::class);
 
     it('throws exception when releasing more permits than capacity', function () {
         $semaphore = new Semaphore(2);
-
         $semaphore->release();
         $semaphore->release();
         $semaphore->release();
@@ -279,7 +277,6 @@ describe('Semaphore', function () {
         await(Promise::all([$task1, $task2, $task3]));
 
         expect($results)->toHaveCount(6)
-            ->and($semaphore->getAvailable())->toBe(5)
-        ;
+            ->and($semaphore->getAvailable())->toBe(5);
     });
 });

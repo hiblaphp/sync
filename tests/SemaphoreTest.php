@@ -28,7 +28,7 @@ describe('Basic Semaphore Operations', function () {
         expect($semaphore->getAvailable())->toBe(5);
         expect($semaphore->getQueueLength())->toBe(0);
         expect($semaphore->isQueueEmpty())->toBeTrue();
-        expect($semaphore->isEmpty())->toBeTrue();
+        expect($semaphore->isIdle())->toBeTrue();
         expect($semaphore->isFull())->toBeFalse();
     });
 
@@ -59,7 +59,7 @@ describe('Basic Semaphore Operations', function () {
 
         $semaphore->release();
         expect($semaphore->getAvailable())->toBe(3);
-        expect($semaphore->isEmpty())->toBeTrue();
+        expect($semaphore->isIdle())->toBeTrue();
     });
 
     it('queues acquire attempts when full', function () {
@@ -143,7 +143,7 @@ describe('Concurrent Access Control', function () {
         expect($maxConcurrent)->toBe(3);
         expect($concurrentCount)->toBe(0);
         expect($semaphore->getAvailable())->toBe(3);
-        expect($semaphore->isEmpty())->toBeTrue();
+        expect($semaphore->isIdle())->toBeTrue();
     });
 
     it('handles quick succession acquire/release', function () {
@@ -157,7 +157,7 @@ describe('Concurrent Access Control', function () {
         }
 
         expect($semaphore->getAvailable())->toBe(5);
-        expect($semaphore->isEmpty())->toBeTrue();
+        expect($semaphore->isIdle())->toBeTrue();
         expect($semaphore->isQueueEmpty())->toBeTrue();
     });
 });
@@ -222,23 +222,23 @@ describe('Semaphore State Inspection', function () {
         $setup = semaphoreTestSetup(2);
         $semaphore = $setup['semaphore'];
 
-        expect($semaphore->isEmpty())->toBeTrue();
+        expect($semaphore->isIdle())->toBeTrue();
         expect($semaphore->isFull())->toBeFalse();
 
         await($semaphore->acquire());
-        expect($semaphore->isEmpty())->toBeFalse();
+        expect($semaphore->isIdle())->toBeFalse();
         expect($semaphore->isFull())->toBeFalse();
 
         await($semaphore->acquire());
-        expect($semaphore->isEmpty())->toBeFalse();
+        expect($semaphore->isIdle())->toBeFalse();
         expect($semaphore->isFull())->toBeTrue();
 
         $semaphore->release();
-        expect($semaphore->isEmpty())->toBeFalse();
+        expect($semaphore->isIdle())->toBeFalse();
         expect($semaphore->isFull())->toBeFalse();
 
         $semaphore->release();
-        expect($semaphore->isEmpty())->toBeTrue();
+        expect($semaphore->isIdle())->toBeTrue();
         expect($semaphore->isFull())->toBeFalse();
     });
 });
@@ -324,7 +324,8 @@ describe('Multiple Permits Operations', function () {
         expect($semaphore->getAvailable())->toBe(1);
 
         $promise = $semaphore->acquireMany(3);
-        expect($semaphore->getQueueLength())->toBe(3);
+        // one entry with needed=3, not 3 duplicate entries
+        expect($semaphore->getQueueLength())->toBe(1);
 
         $semaphore->releaseMany(4);
         expect($semaphore->getQueueLength())->toBe(0);
@@ -372,7 +373,7 @@ describe('Multiple Permits Operations', function () {
 
         expect(count($sharedLog))->toBe(6);
         expect($semaphore->getAvailable())->toBe(10);
-        expect($semaphore->isEmpty())->toBeTrue();
+        expect($semaphore->isIdle())->toBeTrue();
     });
 });
 

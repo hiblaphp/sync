@@ -3,18 +3,12 @@
 declare(strict_types=1);
 
 use function Hibla\async;
-
 use function Hibla\asyncFn;
-
 use function Hibla\await;
 use function Hibla\delay;
-use function Hibla\Promise\all;
-use function Hibla\Promise\allSettled;
-use function Hibla\Promise\batch;
-use function Hibla\Promise\concurrent;
-use function Hibla\Promise\race;
-use function Hibla\Promise\timeout;
 
+use Hibla\Promise\Exceptions\TimeoutException;
+use Hibla\Promise\Promise;
 use Hibla\Sync\Mutex;
 
 describe('Promise::all() with Mutex', function () {
@@ -43,7 +37,7 @@ describe('Promise::all() with Mutex', function () {
             $tasks[] = async($protectedWork("Task-$i"));
         }
 
-        $results = await(all($tasks));
+        $results = await(Promise::all($tasks));
 
         expect($sharedCounter)->toBe(5);
         expect(count($results))->toBe(5);
@@ -94,7 +88,7 @@ describe('Promise::race() with Mutex', function () {
             }),
         ];
 
-        $winner = await(race($raceTasks));
+        $winner = await(Promise::race($raceTasks));
 
         expect($winner)->toContain('Fast-Task completed');
         expect($sharedCounter)->toBeGreaterThan(0);
@@ -126,7 +120,7 @@ describe('Promise::concurrent() with Mutex', function () {
             $tasks[] = fn () => $createTask($i);
         }
 
-        $results = await(concurrent($tasks, 3));
+        $results = await(Promise::concurrent($tasks, 3));
 
         expect($sharedCounter)->toBe(8);
         expect(count($results))->toBe(8);
@@ -162,7 +156,7 @@ describe('Promise::batch() with Mutex', function () {
             $tasks[] = fn () => $createTask($i);
         }
 
-        $results = await(batch($tasks, 3, 2));
+        $results = await(Promise::batch($tasks, 3, 2));
 
         expect($sharedCounter)->toBe(6);
         expect(count($results))->toBe(6);
@@ -199,17 +193,18 @@ describe('Promise::allSettled() with Mutex', function () {
                 $sharedLog[] = "Failure task: counter = {$sharedCounter}";
                 $lock->release();
 
-                throw new Exception('Intentional failure');
+                throw new RuntimeException('Intentional failure');
             }),
             async($protectedWork('Success-2')),
         ];
 
-        $results = await(allSettled($tasks));
+        $results = await(Promise::allSettled($tasks));
 
         expect(count($results))->toBe(3);
-        expect($results[0]['status'])->toBe('fulfilled');
-        expect($results[1]['status'])->toBe('rejected');
-        expect($results[2]['status'])->toBe('fulfilled');
+        expect($results[0]->isFulfilled())->toBeTrue();
+        expect($results[1]->isRejected())->toBeTrue();
+        expect($results[2]->isFulfilled())->toBeTrue();
+        expect($results[1]->reason->getMessage())->toBe('Intentional failure');
         expect($sharedCounter)->toBe(3);
     });
 });
@@ -238,7 +233,7 @@ describe('Multiple Mutexes', function () {
             });
         }
 
-        await(all($tasks));
+        await(Promise::all($tasks));
 
         expect($resource1)->toBe(6);
         expect($resource2)->toBe(12);
@@ -260,8 +255,8 @@ describe('Timeout with Mutex', function () {
                 return 'Should not complete';
             });
 
-            await(timeout($timeoutTask, 0.1));
-        })->toThrow(Exception::class);
+            await(Promise::timeout($timeoutTask, 0.1));
+        })->toThrow(TimeoutException::class);
 
         expect($timeoutCounter)->toBeLessThanOrEqual(1);
     });

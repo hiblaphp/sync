@@ -4,26 +4,20 @@ declare(strict_types=1);
 
 use function Hibla\async;
 use function Hibla\asyncFn;
-
 use function Hibla\await;
-
 use function Hibla\delay;
-use function Hibla\Promise\all;
-use function Hibla\Promise\batch;
-use function Hibla\Promise\concurrent;
 
+use Hibla\Promise\Promise;
 use Hibla\Sync\Mutex;
 
 describe('Basic Mutex Functionality', function () {
     it('starts in correct initial state and handles acquire/release', function () {
         $mutex = new Mutex();
 
-        // Test initial state
         expect($mutex->isLocked())->toBeFalse();
         expect($mutex->getQueueLength())->toBe(0);
         expect($mutex->isQueueEmpty())->toBeTrue();
 
-        // Test acquire and release
         $lockPromise = $mutex->acquire();
         expect($mutex->isLocked())->toBeTrue();
 
@@ -59,7 +53,6 @@ describe('Concurrent Access Protection', function () {
             });
         }
 
-        // Wait for all tasks
         $results = [];
         foreach ($tasks as $task) {
             $results[] = await($task);
@@ -69,7 +62,6 @@ describe('Concurrent Access Protection', function () {
         expect($sharedLog)->toHaveCount(5);
         expect($results)->toBe($expectedResults);
 
-        // Verify sequential execution
         for ($i = 0; $i < 5; $i++) {
             expect($sharedLog[$i])->toContain("$i -> " . ($i + 1));
         }
@@ -98,7 +90,7 @@ describe('Promise::all() Integration', function () {
             });
         }
 
-        $results = await(all($tasks));
+        $results = await(Promise::all($tasks));
 
         expect($sharedCounter)->toBe(4);
         expect($results)->toHaveCount(4);
@@ -134,7 +126,7 @@ describe('Promise::concurrent() Integration', function () {
             $tasks[] = fn () => $createTask($i);
         }
 
-        $results = await(concurrent($tasks, 3));
+        $results = await(Promise::concurrent($tasks, 3));
 
         expect($sharedCounter)->toBe(6);
         expect($results)->toHaveCount(6);
@@ -170,7 +162,7 @@ describe('Promise::batch() Integration', function () {
             $tasks[] = fn () => $createTask($i);
         }
 
-        $results = await(batch($tasks, batchSize: 2, concurrency: 2));
+        $results = await(Promise::batch($tasks, batchSize: 2, concurrency: 2));
 
         expect($sharedCounter)->toBe(5);
         expect($results)->toHaveCount(5);
@@ -202,10 +194,10 @@ describe('Multiple Mutexes', function () {
             });
         }
 
-        $results = await(all($tasks));
+        $results = await(Promise::all($tasks));
 
-        expect($resource1)->toBe(6); // 1+2+3
-        expect($resource2)->toBe(12); // 2+4+6
+        expect($resource1)->toBe(6);
+        expect($resource2)->toBe(12);
         expect($results)->toHaveCount(3);
     });
 });
@@ -214,28 +206,23 @@ describe('Mutex Queueing', function () {
     it('properly queues and processes waiting acquire requests', function () {
         $mutex = new Mutex();
 
-        // First acquire - should succeed immediately
         $firstLock = await($mutex->acquire());
         expect($mutex->isLocked())->toBeTrue();
         expect($mutex->getQueueLength())->toBe(0);
 
-        // Second and third acquire - should be queued
         $secondPromise = $mutex->acquire();
         $thirdPromise = $mutex->acquire();
         expect($mutex->getQueueLength())->toBe(2);
 
-        // Release first lock - should pass to second waiter
         $firstLock->release();
-        expect($mutex->isLocked())->toBeTrue(); // Still locked by second
+        expect($mutex->isLocked())->toBeTrue();
         expect($mutex->getQueueLength())->toBe(1);
 
-        // Get second lock and release
         $secondLock = await($secondPromise);
         expect($secondLock)->toBe($mutex);
         $secondLock->release();
         expect($mutex->getQueueLength())->toBe(0);
 
-        // Get third lock and release
         $thirdLock = await($thirdPromise);
         $thirdLock->release();
         expect($mutex->isLocked())->toBeFalse();
