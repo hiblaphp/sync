@@ -2,10 +2,7 @@
 
 **Async-aware synchronization primitives for PHP built on the Hibla event loop.**
 
-`hiblaphp/sync` provides a `Mutex` and `Semaphore` for coordinating access to
-shared state in async PHP applications. Both primitives are built on promises
-and fibers — they never block the thread, queue waiters cooperatively, and
-integrate cleanly with cancellation.
+`hiblaphp/sync` provides a `Mutex` and `Semaphore` for coordinating access to shared state in async PHP applications. Both primitives are built on promises and fibers. They never block the thread, queue waiters cooperatively, and integrate cleanly with cancellation.
 
 [![Latest Release](https://img.shields.io/github/release/hiblaphp/sync.svg?style=flat-square)](https://github.com/hiblaphp/sync/releases)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](./LICENSE)
@@ -61,30 +58,15 @@ composer require hiblaphp/sync
 
 ## Introduction
 
-`hiblaphp/sync` provides a `Mutex` and `Semaphore` for coordinating access to
-shared state in async PHP applications. Both primitives are built on promises
-and fibers — they never block the thread, queue waiters cooperatively, and
-integrate cleanly with cancellation.
+`hiblaphp/sync` provides a `Mutex` and `Semaphore` for coordinating access to shared state in async PHP applications. Both primitives are built on promises and fibers. They never block the thread, queue waiters cooperatively, and integrate cleanly with cancellation.
 
-> **Note:** This library is designed to be used with
-> [`hiblaphp/async`](https://github.com/hiblaphp/async). The `withLock()` and
-> `withPermit()` helpers run their callable inside `async()` implicitly, so
-> `await()` works freely inside them and the critical section reads like
-> ordinary synchronous PHP. While the lower-level `acquire()` and `release()`
-> methods work with raw promise chains, `withLock()` and `withPermit()` are the
-> recommended API for any `hiblaphp/async` application.
+> **Note:** This library is designed to be used with [`hiblaphp/async`](https://github.com/hiblaphp/async). The `withLock()` and `withPermit()` helpers run their callable inside `async()` implicitly, so `await()` works freely inside them and the critical section reads like ordinary synchronous PHP. While the lower-level `acquire()` and `release()` methods work with raw promise chains, `withLock()` and `withPermit()` are the recommended API for any `hiblaphp/async` application.
 
 ### Why you need this
 
-PHP is single-threaded. Only one piece of code runs at any given moment. This
-leads to an easy assumption: if there are no threads, there are no race
-conditions. This assumption is wrong in async PHP.
+PHP is single-threaded. Only one piece of code runs at any given moment. This leads to an easy assumption: if there are no threads, there are no race conditions. This assumption is wrong in async PHP.
 
-The source of races in async PHP is not parallelism — it is **cooperative
-context switching**. Every time a fiber calls `await()`, it suspends and yields
-control back to the event loop. The event loop then resumes another fiber. When
-that fiber also suspends, the first fiber may resume again — and by then, shared
-state may have changed underneath it.
+The source of races in async PHP is not parallelism. It is **cooperative context switching**. Every time a fiber calls `await()`, it suspends and yields control back to the event loop. The event loop then resumes another fiber. When that fiber also suspends, the first fiber may resume again, and by then, shared state may have changed underneath it.
 
 Consider a counter incremented by 5 concurrent fibers:
 ```php
@@ -110,13 +92,9 @@ await(Promise::all($tasks));
 echo $counter; // expected: 5 — actual: could be 1, 2, 3, or 4
 ```
 
-Every `await()` is a potential context switch. Any shared state read before an
-`await()` may be stale by the time the fiber resumes. This is the same class of
-bug as a thread race condition — just triggered by `await()` instead of a CPU
-preemption.
+Every `await()` is a potential context switch. Any shared state read before an `await()` may be stale by the time the fiber resumes. This is the same class of bug as a thread race condition, just triggered by `await()` instead of a CPU preemption.
 
-The same problem appears in any real-world scenario involving shared state and
-async I/O:
+The same problem appears in any real-world scenario involving shared state and async I/O:
 ```php
 use function Hibla\async;
 use function Hibla\await;
@@ -140,9 +118,7 @@ async(function () use ($account, $amount) {
 });
 ```
 
-A `Mutex` closes these windows. The entire read-check-write sequence runs inside
-`withLock()` — no other fiber can enter until the current one exits, regardless
-of how many `await()` calls happen inside:
+A `Mutex` closes these windows. The entire read-check-write sequence runs inside `withLock()`. No other fiber can enter until the current one exits, regardless of how many `await()` calls happen inside:
 ```php
 use Hibla\Sync\Mutex;
 use function Hibla\async;
@@ -160,22 +136,13 @@ async(function () use ($mutex, $cache, $key) {
 });
 ```
 
-The key insight is that **atomicity in async PHP means uninterrupted from the
-perspective of other fibers** — not uninterrupted from the perspective of the
-CPU. The mutex does not stop the event loop from running. While one fiber holds
-the lock and is suspended inside `await()`, other fibers that do not compete
-for this lock run freely. Only fibers that call `acquire()` on the same mutex
-are made to wait.
+The key insight is that **atomicity in async PHP means uninterrupted from the perspective of other fibers**, not uninterrupted from the perspective of the CPU. The mutex does not stop the event loop from running. While one fiber holds the lock and is suspended inside `await()`, other fibers that do not compete for this lock run freely. Only fibers that call `acquire()` on the same mutex are made to wait.
 
 ### How this differs from Promise concurrency utilities
 
-`hiblaphp/promise` ships utilities like `Promise::concurrent()`,
-`Promise::batch()`, and `Promise::map()` that control how many tasks run
-simultaneously. These answer the question: **how many tasks should run at the
-same time?**
+`hiblaphp/promise` ships utilities like `Promise::concurrent()`, `Promise::batch()`, and `Promise::map()` that control how many tasks run simultaneously. These answer the question: **how many tasks should run at the same time?**
 
-`hiblaphp/sync` answers a different question: **how do concurrent tasks safely
-share state?**
+`hiblaphp/sync` answers a different question: **how do concurrent tasks safely share state?**
 
 The distinction matters. Consider fetching 100 records from an API:
 ```php
@@ -210,8 +177,7 @@ await(Promise::concurrent(
 ));
 ```
 
-`Promise::concurrent()` does not know or care about `$counter`. It only
-controls when tasks start. A `Mutex` is what makes the increment safe:
+`Promise::concurrent()` does not know or care about `$counter`. It only controls when tasks start. A `Mutex` is what makes the increment safe:
 ```php
 use Hibla\Sync\Mutex;
 use function Hibla\async;
@@ -233,15 +199,9 @@ await(Promise::concurrent(
 // $counter is always 10 — no race
 ```
 
-The two compose naturally — `Promise::concurrent()` controls how many tasks
-start, while `Mutex` and `Semaphore` control what those tasks can safely do
-once running. They solve different problems and are commonly used together.
+The two compose naturally. `Promise::concurrent()` controls how many tasks start, while `Mutex` and `Semaphore` control what those tasks can safely do once running. They solve different problems and are commonly used together.
 
-A `Semaphore` can look similar to `Promise::concurrent()` at a glance — both
-limit how many fibers do something at once. The difference is scope.
-`Promise::concurrent()` limits task throughput at one call site. A `Semaphore`
-limits access to a specific shared resource from anywhere in the codebase,
-across multiple independent call sites:
+A `Semaphore` can look similar to `Promise::concurrent()` at a glance, since both limit how many fibers do something at once. The difference is scope. `Promise::concurrent()` limits task throughput at one call site. A `Semaphore` limits access to a specific shared resource from anywhere in the codebase, across multiple independent call sites:
 ```php
 use Hibla\Sync\Semaphore;
 use function Hibla\async;
@@ -276,27 +236,21 @@ async(function () use ($dbPool, $queryB) {
 | **Question answered** | How many tasks run at once? | How do running tasks share state safely? |
 | **Unit of control** | Task lifecycle (start / stop) | Access to a shared resource |
 | **Typical use case** | API rate limiting, batch processing, queue workers | Shared counters, caches, connection pools, critical sections |
-| **Interaction model** | Tasks are independent | Tasks coordinate — one waits for another to finish |
+| **Interaction model** | Tasks are independent | Tasks coordinate, one waits for another to finish |
 | **What it prevents** | Overwhelming external systems | Race conditions on shared mutable state |
 | **Scope** | Single call site | Across any number of call sites |
 
-Use `Promise::concurrent()` when the concern is throughput and scheduling. Use
-`Mutex` and `Semaphore` when the concern is correctness and shared state. In a
-real application you will typically use both.
+Use `Promise::concurrent()` when the concern is throughput and scheduling. Use `Mutex` and `Semaphore` when the concern is correctness and shared state. In a real application you will typically use both.
 
 ---
 
 ## Mutex
 
-A `Mutex` (mutual exclusion lock) ensures that only one fiber runs a critical
-section at a time. All other fibers that attempt to enter queue and wait their
-turn in FIFO order. The event loop continues running freely while waiters are
-queued — only fibers competing for this specific mutex are held back.
+A `Mutex` (mutual exclusion lock) ensures that only one fiber runs a critical section at a time. All other fibers that attempt to enter queue and wait their turn in FIFO order. The event loop continues running freely while waiters are queued. Only fibers competing for this specific mutex are held back.
 
 ### Basic Usage
 
-`acquire()` returns a promise that resolves with the mutex instance when the
-lock is available. Call `release()` on the resolved instance to unlock:
+`acquire()` returns a promise that resolves with the mutex instance when the lock is available. Call `release()` on the resolved instance to unlock:
 ```php
 use Hibla\Sync\Mutex;
 use function Hibla\async;
@@ -317,16 +271,11 @@ async(function () use ($mutex) {
 });
 ```
 
-Always release in a `finally` block. A missing `release()` after a throw
-leaves the mutex permanently locked and all waiters stuck forever. For this
-reason, `withLock()` is the preferred API.
+Always release in a `finally` block. A missing `release()` after a throw leaves the mutex permanently locked and all waiters stuck forever. For this reason, `withLock()` is the preferred API.
 
 ### `withLock()`
 
-`withLock()` acquires the lock, runs the callable inside a fiber, and releases
-automatically — on fulfillment, rejection, and cancellation. The callable runs
-inside `async()` implicitly, so `await()` can be used freely inside it without
-any extra wrapping:
+`withLock()` acquires the lock, runs the callable inside a fiber, and releases automatically on fulfillment, rejection, and cancellation. The callable runs inside `async()` implicitly, so `await()` can be used freely inside it without any extra wrapping:
 ```php
 use Hibla\Sync\Mutex;
 use function Hibla\async;
@@ -343,9 +292,7 @@ async(function () use ($mutex) {
 });
 ```
 
-The callable looks like synchronous code. Each `await()` suspends only the
-current fiber — the event loop continues running other work — but the mutex
-remains locked for the entire duration, including across all awaited operations.
+The callable looks like synchronous code. Each `await()` suspends only the current fiber. The event loop continues running other work, but the mutex remains locked for the entire duration, including across all awaited operations.
 
 **Release is guaranteed in all outcomes:**
 ```php
@@ -391,9 +338,7 @@ async(function () use ($mutex) {
 
 ### Queueing and fairness
 
-When the mutex is locked, subsequent `acquire()` and `withLock()` calls queue
-in FIFO order. `release()` passes ownership directly to the next waiter without
-unlocking — the mutex stays locked the whole time ownership transfers:
+When the mutex is locked, subsequent `acquire()` and `withLock()` calls queue in FIFO order. `release()` passes ownership directly to the next waiter without unlocking. The mutex stays locked the whole time ownership transfers:
 ```php
 use Hibla\Sync\Mutex;
 use function Hibla\async;
@@ -424,9 +369,7 @@ async(function () use ($mutex) {
 
 ### Cancellation
 
-Cancelling a queued `acquire()` or `withLock()` promise removes it from the
-queue immediately and cleanly. The lock state is unaffected and the next live
-waiter is not skipped:
+Cancelling a queued `acquire()` or `withLock()` promise removes it from the queue immediately and cleanly. The lock state is unaffected and the next live waiter is not skipped:
 ```php
 use Hibla\Sync\Mutex;
 use function Hibla\async;
@@ -455,14 +398,11 @@ async(function () use ($mutex) {
 
 ## Semaphore
 
-A `Semaphore` allows up to N fibers to run a section simultaneously. It
-generalises the `Mutex` — a `Mutex` is a `Semaphore` with a capacity of 1.
-Common uses are connection pools, rate limiting, and bulk resource acquisition.
+A `Semaphore` allows up to N fibers to run a section simultaneously. It generalises the `Mutex`. A `Mutex` is a `Semaphore` with a capacity of 1. Common uses are connection pools, rate limiting, and bulk resource acquisition.
 
 ### Basic Usage
 
-Construct with a permit count. `acquire()` returns a promise that resolves with
-the semaphore instance when a permit is available:
+Construct with a permit count. `acquire()` returns a promise that resolves with the semaphore instance when a permit is available:
 ```php
 use Hibla\Sync\Semaphore;
 use function Hibla\async;
@@ -484,10 +424,7 @@ async(function () use ($semaphore) {
 
 ### `withPermit()` and `withPermits()`
 
-`withPermit()` acquires one permit and runs the callable in a fiber.
-`withPermits()` acquires N permits atomically. Both release automatically on
-fulfillment, rejection, and cancellation. The callable runs inside `async()`
-implicitly — `await()` works freely inside it:
+`withPermit()` acquires one permit and runs the callable in a fiber. `withPermits()` acquires N permits atomically. Both release automatically on fulfillment, rejection, and cancellation. The callable runs inside `async()` implicitly, so `await()` works freely inside it:
 ```php
 use Hibla\Sync\Semaphore;
 use function Hibla\async;
@@ -537,8 +474,7 @@ async(function () use ($semaphore) {
 
 ### `tryAcquire()`
 
-`tryAcquire()` attempts to acquire one permit without waiting. Returns `true`
-if acquired, `false` if no permits are available. Never queues:
+`tryAcquire()` attempts to acquire one permit without waiting. Returns `true` if acquired, `false` if no permits are available. Never queues:
 ```php
 use Hibla\Sync\Semaphore;
 use function Hibla\async;
@@ -561,9 +497,7 @@ async(function () use ($semaphore) {
 
 ### `acquireMany()` and `releaseMany()`
 
-`acquireMany(N)` acquires N permits atomically. The promise only resolves when
-N permits are simultaneously available — it accumulates permits across multiple
-`release()` calls and will not resolve early with fewer than requested:
+`acquireMany(N)` acquires N permits atomically. The promise only resolves when N permits are simultaneously available. It accumulates permits across multiple `release()` calls and will not resolve early with fewer than requested:
 ```php
 use Hibla\Sync\Semaphore;
 use function Hibla\async;
@@ -583,9 +517,7 @@ async(function () use ($semaphore) {
 });
 ```
 
-`releaseMany()` validates the full release before touching any state. If
-releasing N permits would exceed capacity, it throws `LogicException` before
-any permits are returned — no partial corruption:
+`releaseMany()` validates the full release before touching any state. If releasing N permits would exceed capacity, it throws `LogicException` before any permits are returned, so there is no partial corruption:
 ```php
 use Hibla\Sync\Semaphore;
 
@@ -600,10 +532,7 @@ try {
 
 ### Queueing and fairness
 
-Waiters are queued in FIFO order. The head waiter accumulates permits across
-multiple `release()` calls until its full requirement is met — smaller requests
-that arrive later do not jump the queue. This prevents starvation of large
-permit requests:
+Waiters are queued in FIFO order. The head waiter accumulates permits across multiple `release()` calls until its full requirement is met. Smaller requests that arrive later do not jump the queue. This prevents starvation of large permit requests:
 ```php
 use Hibla\Sync\Semaphore;
 use function Hibla\async;
@@ -629,9 +558,7 @@ async(function () use ($semaphore) {
 
 ### Cancellation
 
-Cancelling a queued `acquire()`, `acquireMany()`, `withPermit()`, or
-`withPermits()` promise removes it from the queue immediately. No permit is
-consumed and the next waiter is not affected:
+Cancelling a queued `acquire()`, `acquireMany()`, `withPermit()`, or `withPermits()` promise removes it from the queue immediately. No permit is consumed and the next waiter is not affected:
 ```php
 use Hibla\Sync\Semaphore;
 use function Hibla\async;
@@ -660,9 +587,7 @@ async(function () use ($semaphore) {
 
 ## Interfaces
 
-Both primitives are backed by interfaces, making them replaceable for testing
-and extension. Type-hint against the interface rather than the concrete class
-anywhere you need to inject either primitive:
+Both primitives are backed by interfaces, making them replaceable for testing and extension. Type-hint against the interface rather than the concrete class anywhere you need to inject either primitive:
 ```php
 use Hibla\Sync\Interfaces\MutexInterface;
 use Hibla\Sync\Interfaces\SemaphoreInterface;
