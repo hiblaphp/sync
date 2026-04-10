@@ -5,6 +5,8 @@
 `hiblaphp/sync` provides a `Mutex` and `Semaphore` for coordinating access to shared state in async PHP applications. Both primitives are built on promises and fibers. They never block the thread, queue waiters cooperatively, and integrate cleanly with cancellation.
 
 [![Latest Release](https://img.shields.io/github/release/hiblaphp/sync.svg?style=flat-square)](https://github.com/hiblaphp/sync/releases)
+[![Tests](https://github.com/hiblaphp/sync/actions/workflows/test.yml/badge.svg)](https://github.com/hiblaphp/sync/actions/workflows/test.yml)
+[![Total Downloads](https://img.shields.io/packagist/dt/hiblaphp/sync.svg?style=flat-square)](https://packagist.org/packages/hiblaphp/sync)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](./LICENSE)
 
 ---
