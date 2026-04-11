@@ -17,10 +17,15 @@ use Hibla\Sync\Interfaces\MutexInterface;
  * fibers that attempt to acquire the lock are queued in FIFO order and
  * released one at a time as the lock is released.
  *
+ * Common use cases:
+ * - Protecting shared mutable state from concurrent modification
+ * - Serializing writes to a resource that doesn't support concurrent access
+ * - Guarding initialization logic that must only run once
+ *
  * The event loop continues running freely while fibers are waiting — only
  * fibers competing for this specific mutex are held back. A mutex only
- * serializes access when multiple fibers share the same instance. Each
- * instance is an independent lock.
+ * limits access when multiple fibers share the same instance. Each
+ * instance manages an independent lock.
  *
  * Designed for use with hiblaphp/async. The withLock() helper runs its
  * callable inside async() implicitly, so await() works freely inside it
@@ -31,8 +36,8 @@ use Hibla\Sync\Interfaces\MutexInterface;
  * $mutex = new Mutex();
  *
  * await($mutex->withLock(function () {
- *     $balance = await($account->getBalance());
- *     await($account->deduct($amount));
+ *     $data = await(readSharedState());
+ *     await(writeSharedState($data + 1));
  * }));
  * ```
  *
@@ -49,15 +54,18 @@ use Hibla\Sync\Interfaces\MutexInterface;
 class Mutex implements MutexInterface
 {
     /**
-     * @var array<int, Promise<$this>>
+     * @inheritDoc
      */
-    private array $queue = [];
+    public int $queueLength {
+        get => \count($this->queue);
+    }
 
     private bool $locked = false;
 
-    public function __construct()
-    {
-    }
+    /**
+     * @var array<int, Promise<$this>>
+     */
+    private array $queue = [];
 
     /**
      * @inheritDoc
@@ -77,6 +85,7 @@ class Mutex implements MutexInterface
 
         $promise->onCancel(function () use ($id): void {
             unset($this->queue[$id]);
+            // Lock was never granted — no state to restore.
         });
 
         return $promise;
@@ -92,11 +101,15 @@ class Mutex implements MutexInterface
         }
 
         if (\count($this->queue) === 0) {
+            // No waiters — mark the mutex as available for immediate acquisition.
             $this->locked = false;
 
             return;
         }
 
+        // Transfer ownership directly to the next waiter without unlocking.
+        // The mutex stays locked the entire time — no window for a new
+        // acquisition to jump the queue between release and the next resolve.
         $id = array_key_first($this->queue);
         $promise = $this->queue[$id];
         unset($this->queue[$id]);
@@ -106,12 +119,6 @@ class Mutex implements MutexInterface
 
     /**
      * @inheritDoc
-     *
-     * @template TReturn
-     * @param  callable(): TReturn  $callable  The callable to execute inside the lock.
-     *                                          Use await() freely — it runs in a fiber.
-     * @return PromiseInterface<TReturn> Promise that resolves with the callable's
-     *                                   return value once the lock is released.
      */
     public function withLock(callable $callable): PromiseInterface
     {
@@ -119,11 +126,17 @@ class Mutex implements MutexInterface
             $inner = async($callable);
 
             $inner->then(
-                onFulfilled: $this->release(...),
-                onRejected: $this->release(...)
+                onFulfilled: function (): void {
+                    $this->release();
+                },
+                onRejected: function (): void {
+                    $this->release();
+                }
             );
 
-            $inner->onCancel($this->release(...));
+            $inner->onCancel(function (): void {
+                $this->release();
+            });
 
             return $inner;
         });
@@ -140,16 +153,8 @@ class Mutex implements MutexInterface
     /**
      * @inheritDoc
      */
-    public function getQueueLength(): int
-    {
-        return \count($this->queue);
-    }
-
-    /**
-     * @inheritDoc
-     */
     public function isQueueEmpty(): bool
     {
-        return \count($this->queue) === 0;
+        return count($this->queue) === 0;
     }
 }

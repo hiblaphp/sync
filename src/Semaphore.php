@@ -53,14 +53,31 @@ use Hibla\Sync\Interfaces\SemaphoreInterface;
  */
 class Semaphore implements SemaphoreInterface
 {
-    private int $available;
-
-    private int $capacity;
-
     /**
      * @var array<int, array{promise: Promise<$this>, needed: int}>
      */
     private array $queue = [];
+
+    /**
+     * @inheritDoc
+     */
+    public int $available {
+        get => $this->available;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public int $capacity {
+        get => $this->capacity;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public int $queueLength {
+        get => \count($this->queue);
+    }
 
     /**
      * Create a new Semaphore instance.
@@ -138,13 +155,13 @@ class Semaphore implements SemaphoreInterface
         }
 
         // Return the permit to the pool first so the head waiter
-        // can accumulate permits across multiple release() calls
+        // can accumulate permits across multiple release() calls.
         $this->available++;
 
         $id = array_key_first($this->queue);
         $entry = $this->queue[$id];
 
-        // Only satisfy the head waiter when enough permits have accumulated
+        // Only satisfy the head waiter when enough permits have accumulated.
         if ($this->available >= $entry['needed']) {
             $this->available -= $entry['needed'];
             unset($this->queue[$id]);
@@ -162,7 +179,7 @@ class Semaphore implements SemaphoreInterface
         }
 
         // Calculate how many permits would return to available after
-        // satisfying queued waiters — validate before touching any state
+        // satisfying queued waiters — validate before touching any state.
         $returning = $permits;
         foreach ($this->queue as $entry) {
             $returning -= $entry['needed'];
@@ -192,8 +209,8 @@ class Semaphore implements SemaphoreInterface
      * @inheritDoc
      *
      * @template TReturn
-     * @param int $permits Number of permits to acquire atomically (must be >= 1 and <= capacity).
-     * @param  callable(): TReturn $callable  The callable to execute inside the permits.
+     * @param  int  $permits  Number of permits to acquire atomically (must be >= 1 and <= capacity).
+     * @param  callable(): TReturn  $callable  The callable to execute inside the permits.
      *                                          Use await() freely — it runs in a fiber.
      * @return PromiseInterface<TReturn> Promise that resolves with the callable's
      *                                   return value once all permits are released.
@@ -233,30 +250,6 @@ class Semaphore implements SemaphoreInterface
         }
 
         return false;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function getAvailable(): int
-    {
-        return $this->available;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function getCapacity(): int
-    {
-        return $this->capacity;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function getQueueLength(): int
-    {
-        return \count($this->queue);
     }
 
     /**

@@ -350,15 +350,15 @@ $mutex = new Mutex();
 
 async(function () use ($mutex) {
     $lock = await($mutex->acquire());
-    echo $mutex->getQueueLength(); // 0
+    echo $mutex->queueLength; // 0
 
     $waiter1 = $mutex->acquire();
     $waiter2 = $mutex->acquire();
-    echo $mutex->getQueueLength(); // 2
+    echo $mutex->queueLength; // 2
 
     $lock->release();
     echo $mutex->isLocked();       // true — waiter1 now holds it
-    echo $mutex->getQueueLength(); // 1
+    echo $mutex->queueLength; // 1
 
     $lock1 = await($waiter1);
     $lock1->release();             // waiter2 gets the lock
@@ -384,11 +384,11 @@ async(function () use ($mutex) {
 
     $waiterA = $mutex->acquire();
     $waiterB = $mutex->acquire();
-    echo $mutex->getQueueLength(); // 2
+    echo $mutex->queueLength; // 2
 
     $waiterA->catch(static fn() => null);
     $waiterA->cancel();
-    echo $mutex->getQueueLength(); // 1 — waiterA removed, waiterB still queued
+    echo $mutex->queueLength; // 1 — waiterA removed, waiterB still queued
 
     $lock->release();
     $lockB = await($waiterB);      // waiterB gets the lock — not skipped
@@ -573,11 +573,11 @@ async(function () use ($semaphore) {
 
     $waiterA = $semaphore->acquire();
     $waiterB = $semaphore->acquire();
-    echo $semaphore->getQueueLength(); // 2
+    echo $semaphore->queueLength; // 2
 
     $waiterA->catch(static fn() => null);
     $waiterA->cancel();
-    echo $semaphore->getQueueLength(); // 1 — waiterA removed cleanly
+    echo $semaphore->queueLength; // 1 — waiterA removed cleanly
 
     $semaphore->release();
     $permitB = await($waiterB); // waiterB gets the permit — not skipped
@@ -618,20 +618,20 @@ class UserRepository
 
 ## Mutex API Reference
 
-| Method | Description |
+| Method/Property | Description |
 |---|---|
 | `acquire(): PromiseInterface<$this>` | Acquire the lock. Resolves immediately if unlocked, queues otherwise. |
 | `release(): void` | Release the lock. Passes ownership to the next waiter if any. Throws `LogicException` if not locked. |
 | `withLock(callable $fn): PromiseInterface` | Acquire the lock, run the callable in a fiber, release automatically on any outcome. |
 | `isLocked(): bool` | Returns `true` if the lock is currently held. |
-| `getQueueLength(): int` | Number of waiters currently queued. |
+| `queueLength: int` | Number of waiters currently queued. |
 | `isQueueEmpty(): bool` | Returns `true` if no waiters are queued. |
 
 ---
 
 ## Semaphore API Reference
 
-| Method | Description |
+| Method/Property | Description |
 |---|---|
 | `acquire(): PromiseInterface<$this>` | Acquire one permit. Resolves immediately if available, queues otherwise. |
 | `acquireMany(int $permits): PromiseInterface<$this>` | Acquire N permits atomically. Only resolves when N are simultaneously available. |
@@ -640,9 +640,9 @@ class UserRepository
 | `withPermit(callable $fn): PromiseInterface` | Acquire 1 permit, run the callable in a fiber, release automatically on any outcome. |
 | `withPermits(int $permits, callable $fn): PromiseInterface` | Acquire N permits, run the callable in a fiber, release automatically on any outcome. |
 | `tryAcquire(): bool` | Try to acquire 1 permit without waiting. Returns `false` if unavailable. Never queues. |
-| `getAvailable(): int` | Number of permits currently available. |
-| `getCapacity(): int` | Maximum number of permits. |
-| `getQueueLength(): int` | Number of waiters currently queued. |
+| `available: int` | Number of permits currently available. |
+| `capacity: int` | Maximum number of permits. |
+| `queueLength: int` | Number of waiters currently queued. |
 | `isQueueEmpty(): bool` | Returns `true` if no waiters are queued. |
 | `isFull(): bool` | Returns `true` if no permits are available. |
 | `isIdle(): bool` | Returns `true` if all permits are available (none in use). |

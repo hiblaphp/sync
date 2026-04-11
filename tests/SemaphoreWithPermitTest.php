@@ -15,13 +15,13 @@ describe('Semaphore::withPermit()', function () {
         $semaphore = new Semaphore(2);
 
         $result = await($semaphore->withPermit(function () use ($semaphore) {
-            expect($semaphore->getAvailable())->toBe(1);
+            expect($semaphore->available)->toBe(1);
 
             return 'sync result';
         }));
 
         expect($result)->toBe('sync result');
-        expect($semaphore->getAvailable())->toBe(2);
+        expect($semaphore->available)->toBe(2);
     });
 
     it('acquires and releases permit automatically for async callable', function () {
@@ -29,16 +29,16 @@ describe('Semaphore::withPermit()', function () {
 
         $result = await($semaphore->withPermit(function () use ($semaphore) {
             return async(function () use ($semaphore) {
-                expect($semaphore->getAvailable())->toBe(1);
+                expect($semaphore->available)->toBe(1);
                 await(delay(0.05));
-                expect($semaphore->getAvailable())->toBe(1);
+                expect($semaphore->available)->toBe(1);
 
                 return 'async result';
             });
         }));
 
         expect($result)->toBe('async result');
-        expect($semaphore->getAvailable())->toBe(2);
+        expect($semaphore->available)->toBe(2);
     });
 
     it('releases permit when sync callable throws', function () {
@@ -48,7 +48,7 @@ describe('Semaphore::withPermit()', function () {
             throw new RuntimeException('sync error');
         })))->toThrow(RuntimeException::class, 'sync error');
 
-        expect($semaphore->getAvailable())->toBe(2);
+        expect($semaphore->available)->toBe(2);
     });
 
     it('releases permit when async callable rejects', function () {
@@ -62,7 +62,7 @@ describe('Semaphore::withPermit()', function () {
             });
         })))->toThrow(RuntimeException::class, 'async error');
 
-        expect($semaphore->getAvailable())->toBe(2);
+        expect($semaphore->available)->toBe(2);
     });
 
     it('releases permit when outer promise is cancelled', function () {
@@ -80,12 +80,12 @@ describe('Semaphore::withPermit()', function () {
 
         $check = async(function () use ($semaphore, $outer) {
             await(delay(0.1));
-            expect($semaphore->getAvailable())->toBe(0);
+            expect($semaphore->available)->toBe(0);
 
             $outer->cancel();
 
             await(delay(0.1));
-            expect($semaphore->getAvailable())->toBe(1);
+            expect($semaphore->available)->toBe(1);
         });
 
         await($check);
@@ -112,7 +112,7 @@ describe('Semaphore::withPermit()', function () {
 
         expect($maxConcurrent)->toBe(2);
         expect($concurrent)->toBe(0);
-        expect($semaphore->getAvailable())->toBe(2);
+        expect($semaphore->available)->toBe(2);
     });
 });
 
@@ -122,13 +122,13 @@ describe('Semaphore::withPermits()', function () {
         $semaphore = new Semaphore(5);
 
         $result = await($semaphore->withPermits(3, function () use ($semaphore) {
-            expect($semaphore->getAvailable())->toBe(2);
+            expect($semaphore->available)->toBe(2);
 
             return 'held 3';
         }));
 
         expect($result)->toBe('held 3');
-        expect($semaphore->getAvailable())->toBe(5);
+        expect($semaphore->available)->toBe(5);
     });
 
     it('acquires N permits for async callable and releases after resolve', function () {
@@ -136,16 +136,16 @@ describe('Semaphore::withPermits()', function () {
 
         $result = await($semaphore->withPermits(3, function () use ($semaphore) {
             return async(function () use ($semaphore) {
-                expect($semaphore->getAvailable())->toBe(2);
+                expect($semaphore->available)->toBe(2);
                 await(delay(0.05));
-                expect($semaphore->getAvailable())->toBe(2);
+                expect($semaphore->available)->toBe(2);
 
                 return 'async held 3';
             });
         }));
 
         expect($result)->toBe('async held 3');
-        expect($semaphore->getAvailable())->toBe(5);
+        expect($semaphore->available)->toBe(5);
     });
 
     it('releases N permits when async callable rejects', function () {
@@ -159,7 +159,7 @@ describe('Semaphore::withPermits()', function () {
             });
         })))->toThrow(RuntimeException::class, 'async error');
 
-        expect($semaphore->getAvailable())->toBe(5);
+        expect($semaphore->available)->toBe(5);
     });
 
     it('releases N permits when outer promise is cancelled', function () {
@@ -175,12 +175,12 @@ describe('Semaphore::withPermits()', function () {
 
         $check = async(function () use ($semaphore, $outer) {
             await(delay(0.1));
-            expect($semaphore->getAvailable())->toBe(2);
+            expect($semaphore->available)->toBe(2);
 
             $outer->cancel();
 
             await(delay(0.1));
-            expect($semaphore->getAvailable())->toBe(5);
+            expect($semaphore->available)->toBe(5);
         });
 
         await($check);
@@ -208,7 +208,7 @@ describe('Semaphore::withPermits()', function () {
 
         await(Promise::all([$task1, $task2]));
 
-        expect($semaphore->getAvailable())->toBe(4);
+        expect($semaphore->available)->toBe(4);
 
         $task1EndIndex = array_search('task1 end', $log);
         $task2StartIndex = array_search('task2 start (2 permits)', $log);
@@ -225,23 +225,23 @@ describe('Semaphore::releaseMany() validation', function () {
         await($semaphore->acquire());
         await($semaphore->acquire());
 
-        expect($semaphore->getAvailable())->toBe(0);
+        expect($semaphore->available)->toBe(0);
 
         expect(fn () => $semaphore->releaseMany(5))
             ->toThrow(LogicException::class, 'Cannot release more permits than semaphore capacity')
         ;
 
-        expect($semaphore->getAvailable())->toBe(0);
+        expect($semaphore->available)->toBe(0);
     });
 
     it('succeeds when release count is within capacity', function () {
         $semaphore = new Semaphore(5);
 
         await($semaphore->acquireMany(4));
-        expect($semaphore->getAvailable())->toBe(1);
+        expect($semaphore->available)->toBe(1);
 
         $semaphore->releaseMany(4);
-        expect($semaphore->getAvailable())->toBe(5);
+        expect($semaphore->available)->toBe(5);
     });
 
     it('correctly satisfies queued waiters during releaseMany', function () {
@@ -249,7 +249,7 @@ describe('Semaphore::releaseMany() validation', function () {
         $ran = false;
 
         await($semaphore->acquireMany(4));
-        expect($semaphore->getAvailable())->toBe(0);
+        expect($semaphore->available)->toBe(0);
 
         $waiter = $semaphore->acquireMany(2);
 
@@ -263,6 +263,6 @@ describe('Semaphore::releaseMany() validation', function () {
         await(delay(0.05));
 
         expect($ran)->toBeTrue();
-        expect($semaphore->getAvailable())->toBe(2);
+        expect($semaphore->available)->toBe(2);
     });
 });

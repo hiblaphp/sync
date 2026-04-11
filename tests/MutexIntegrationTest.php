@@ -15,7 +15,7 @@ describe('Basic Mutex Functionality', function () {
         $mutex = new Mutex();
 
         expect($mutex->isLocked())->toBeFalse();
-        expect($mutex->getQueueLength())->toBe(0);
+        expect($mutex->queueLength)->toBe(0);
         expect($mutex->isQueueEmpty())->toBeTrue();
 
         $lockPromise = $mutex->acquire();
@@ -208,20 +208,20 @@ describe('Mutex Queueing', function () {
 
         $firstLock = await($mutex->acquire());
         expect($mutex->isLocked())->toBeTrue();
-        expect($mutex->getQueueLength())->toBe(0);
+        expect($mutex->queueLength)->toBe(0);
 
         $secondPromise = $mutex->acquire();
         $thirdPromise = $mutex->acquire();
-        expect($mutex->getQueueLength())->toBe(2);
+        expect($mutex->queueLength)->toBe(2);
 
         $firstLock->release();
         expect($mutex->isLocked())->toBeTrue();
-        expect($mutex->getQueueLength())->toBe(1);
+        expect($mutex->queueLength)->toBe(1);
 
         $secondLock = await($secondPromise);
         expect($secondLock)->toBe($mutex);
         $secondLock->release();
-        expect($mutex->getQueueLength())->toBe(0);
+        expect($mutex->queueLength)->toBe(0);
 
         $thirdLock = await($thirdPromise);
         $thirdLock->release();

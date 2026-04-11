@@ -20,6 +20,21 @@ use Hibla\Promise\Interfaces\PromiseInterface;
 interface SemaphoreInterface
 {
     /**
+     * The number of permits currently available for immediate acquisition.
+     */
+    public int $available { get; }
+
+    /**
+     * The maximum number of permits this semaphore manages.
+     */
+    public int $capacity { get; }
+
+    /**
+     * The number of promises currently waiting to acquire permits.
+     */
+    public int $queueLength { get; }
+
+    /**
      * Acquire a single permit.
      *
      * If a permit is available, it is immediately acquired and a resolved
@@ -110,21 +125,6 @@ interface SemaphoreInterface
      * Never queues.
      */
     public function tryAcquire(): bool;
-
-    /**
-     * Returns the number of permits currently available for immediate acquisition.
-     */
-    public function getAvailable(): int;
-
-    /**
-     * Returns the maximum number of permits this semaphore manages.
-     */
-    public function getCapacity(): int;
-
-    /**
-     * Returns the number of promises currently waiting to acquire permits.
-     */
-    public function getQueueLength(): int;
 
     /**
      * Returns true if no promises are waiting to acquire permits.

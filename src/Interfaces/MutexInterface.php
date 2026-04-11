@@ -20,6 +20,11 @@ use Hibla\Promise\Interfaces\PromiseInterface;
 interface MutexInterface
 {
     /**
+     * The number of promises currently waiting to acquire the lock.
+     */
+    public int $queueLength { get; }
+
+    /**
      * Acquire the mutex lock.
      *
      * If the mutex is not currently locked, it is immediately acquired and
@@ -78,11 +83,6 @@ interface MutexInterface
      * the lock state can change between checking and acting on the result.
      */
     public function isLocked(): bool;
-
-    /**
-     * Returns the number of promises currently waiting to acquire the lock.
-     */
-    public function getQueueLength(): int;
 
     /**
      * Returns true if no promises are waiting to acquire the lock.

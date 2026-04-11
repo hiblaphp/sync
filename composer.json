@@ -8,15 +8,15 @@
             "Hibla\\Sync\\": "src/"
         }
     },
-    "minimum-stability": "dev",
     "require": {
-        "php": "^8.3",
-        "hiblaphp/event-loop": "dev-main",
-        "hiblaphp/promise": "dev-main",
-        "hiblaphp/async": "dev-main"
+        "php": "^8.4",
+        "hiblaphp/event-loop": "^1.0@alpha",
+        "hiblaphp/promise": "^1.0@alpha",
+        "hiblaphp/cancellation": "^1.0@alpha",
+        "hiblaphp/async": "^1.0@alpha"
     },
     "require-dev": {
-        "pestphp/pest": "^3.0",
+        "pestphp/pest": "^4.0",
         "phpstan/phpstan": "^2.1",
         "phpstan/phpstan-strict-rules": "^2.0",
         "laravel/pint": "^1.25"

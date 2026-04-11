@@ -17,8 +17,8 @@ describe('Semaphore', function () {
     it('creates semaphore with specified capacity', function () {
         $semaphore = new Semaphore(3);
 
-        expect($semaphore->getCapacity())->toBe(3)
-            ->and($semaphore->getAvailable())->toBe(3)
+        expect($semaphore->capacity)->toBe(3)
+            ->and($semaphore->available)->toBe(3)
             ->and($semaphore->isIdle())->toBeTrue()
             ->and($semaphore->isFull())->toBeFalse()
         ;
@@ -32,18 +32,18 @@ describe('Semaphore', function () {
         $semaphore = new Semaphore(2);
 
         $permit1 = await($semaphore->acquire());
-        expect($semaphore->getAvailable())->toBe(1);
+        expect($semaphore->available)->toBe(1);
 
         $permit2 = await($semaphore->acquire());
-        expect($semaphore->getAvailable())->toBe(0)
+        expect($semaphore->available)->toBe(0)
             ->and($semaphore->isFull())->toBeTrue()
         ;
 
         $semaphore->release();
-        expect($semaphore->getAvailable())->toBe(1);
+        expect($semaphore->available)->toBe(1);
 
         $semaphore->release();
-        expect($semaphore->getAvailable())->toBe(2)
+        expect($semaphore->available)->toBe(2)
             ->and($semaphore->isIdle())->toBeTrue()
         ;
     });
@@ -79,7 +79,7 @@ describe('Semaphore', function () {
         await(Promise::all([$task1, $task2, $task3]));
 
         expect($results)->toHaveCount(6)
-            ->and($semaphore->getAvailable())->toBe(2)
+            ->and($semaphore->available)->toBe(2)
         ;
 
         $task3AcquiredIndex = array_search('Task 3 acquired', $results);
@@ -115,7 +115,7 @@ describe('Semaphore', function () {
 
         expect($maxConcurrent)->toBe(3)
             ->and($concurrent)->toBe(0)
-            ->and($semaphore->getAvailable())->toBe(3)
+            ->and($semaphore->available)->toBe(3)
         ;
     });
 
@@ -123,17 +123,17 @@ describe('Semaphore', function () {
         $semaphore = new Semaphore(1);
 
         expect($semaphore->tryAcquire())->toBeTrue()
-            ->and($semaphore->getAvailable())->toBe(0)
+            ->and($semaphore->available)->toBe(0)
         ;
 
         expect($semaphore->tryAcquire())->toBeFalse()
-            ->and($semaphore->getAvailable())->toBe(0)
+            ->and($semaphore->available)->toBe(0)
         ;
 
         $semaphore->release();
 
         expect($semaphore->tryAcquire())->toBeTrue()
-            ->and($semaphore->getAvailable())->toBe(0)
+            ->and($semaphore->available)->toBe(0)
         ;
     });
 
@@ -141,10 +141,10 @@ describe('Semaphore', function () {
         $semaphore = new Semaphore(5);
 
         await($semaphore->acquireMany(3));
-        expect($semaphore->getAvailable())->toBe(2);
+        expect($semaphore->available)->toBe(2);
 
         $semaphore->releaseMany(3);
-        expect($semaphore->getAvailable())->toBe(5);
+        expect($semaphore->available)->toBe(5);
     });
 
     it('throws exception when acquiring more permits than capacity', function () {
@@ -186,26 +186,26 @@ describe('Semaphore', function () {
     it('tracks queue length correctly', function () {
         $semaphore = new Semaphore(1);
 
-        expect($semaphore->getQueueLength())->toBe(0)
+        expect($semaphore->queueLength)->toBe(0)
             ->and($semaphore->isQueueEmpty())->toBeTrue()
         ;
 
         await($semaphore->acquire());
-        expect($semaphore->getQueueLength())->toBe(0);
+        expect($semaphore->queueLength)->toBe(0);
 
         $promise1 = $semaphore->acquire();
-        expect($semaphore->getQueueLength())->toBe(1)
+        expect($semaphore->queueLength)->toBe(1)
             ->and($semaphore->isQueueEmpty())->toBeFalse()
         ;
 
         $promise2 = $semaphore->acquire();
-        expect($semaphore->getQueueLength())->toBe(2);
+        expect($semaphore->queueLength)->toBe(2);
 
         $semaphore->release();
-        expect($semaphore->getQueueLength())->toBe(1);
+        expect($semaphore->queueLength)->toBe(1);
 
         $semaphore->release();
-        expect($semaphore->getQueueLength())->toBe(0)
+        expect($semaphore->queueLength)->toBe(0)
             ->and($semaphore->isQueueEmpty())->toBeTrue()
         ;
     });
@@ -241,7 +241,7 @@ describe('Semaphore', function () {
         expect($totalRequests)->toBe(12)
             ->and($peakConnections)->toBe(3)
             ->and($activeConnections)->toBe(0)
-            ->and($semaphore->getAvailable())->toBe(3)
+            ->and($semaphore->available)->toBe(3)
         ;
     });
 
@@ -277,6 +277,7 @@ describe('Semaphore', function () {
         await(Promise::all([$task1, $task2, $task3]));
 
         expect($results)->toHaveCount(6)
-            ->and($semaphore->getAvailable())->toBe(5);
+            ->and($semaphore->available)->toBe(5)
+        ;
     });
 });
